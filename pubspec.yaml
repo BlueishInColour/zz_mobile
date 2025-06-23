@@ -20,6 +20,7 @@ dependencies:
   permission_handler: ^11.0.0 # Check for the latest version
   image_picker: ^1.0.7 # Check for latest
   record: ^5.0.4       # Check for latest (simple audio recording)
+#  mic_stream: ^
   audioplayers: ^5.2.1   # Check for latest (for playing audio)
   path_provider: ^2.0.12 # For getting file paths
   intl: ^0.20.2 # For date formatting if needed

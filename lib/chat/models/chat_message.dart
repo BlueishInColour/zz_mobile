@@ -1,48 +1,43 @@
-enum MessageSender {
-  user,
-  peer, // For P2P
-  ai,
-  system, // For system messages like "User X joined"
-}
+// models/chat_message.dart
+
+enum MessageSender { user, ai, system } // System for info messages like "User X joined"
+enum MessageStatus { sending, sent, delivered, read, failed }
+enum MessageType { text, image, audio, video } // For future use
 
 class ChatMessage {
   final String id;
   final String text;
+  final String senderId; // ID of the user/AI who sent it
+  final String senderDisplayName; // Display name of sender
+  final String? senderAvatarUrl; // URL for avatar
   final DateTime timestamp;
-  final MessageSender sender;
-  final String? senderId; // Optional: To identify specific users in P2P
+  final MessageSender senderType; // To differentiate AI/User/System easily
+  final MessageStatus status;
+  final MessageType messageType; // Default to text for now
+  // Add fields for image/audio URLs later
 
   ChatMessage({
     required this.id,
     required this.text,
+    required this.senderId,
+    required this.senderDisplayName,
+    this.senderAvatarUrl,
     required this.timestamp,
-    required this.sender,
-    this.senderId,
+    this.senderType = MessageSender.user,
+    this.status = MessageStatus.sending,
+    this.messageType = MessageType.text,
   });
 
-  // Optional: Factory constructor for JSON deserialization if needed
-  factory ChatMessage.fromJson(Map<String, dynamic> json) {
+  // Example: Factory for creating a system message
+  factory ChatMessage.system(String text) {
     return ChatMessage(
-      id: json['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
-      text: json['text'],
-      timestamp: json['timestamp'] != null
-          ? DateTime.parse(json['timestamp'])
-          : DateTime.now(),
-      sender: _senderFromString(json['senderType'] ?? 'system'),
-      senderId: json['senderId'],
+      id: DateTime.now().millisecondsSinceEpoch.toString() + '_system',
+      text: text,
+      senderId: 'system',
+      senderDisplayName: 'System',
+      timestamp: DateTime.now(),
+      senderType: MessageSender.system,
+      status: MessageStatus.sent, // System messages are considered sent
     );
-  }
-
-  static MessageSender _senderFromString(String senderStr) {
-    switch (senderStr.toLowerCase()) {
-      case 'user':
-        return MessageSender.user;
-      case 'peer':
-        return MessageSender.peer;
-      case 'ai':
-        return MessageSender.ai;
-      default:
-        return MessageSender.system;
-    }
   }
 }

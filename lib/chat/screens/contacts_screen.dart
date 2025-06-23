@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter_contacts/flutter_contacts.dart'; // Assuming this is your contacts plugin
 
 import '../providers/chat_provider.dart';
-import '../widget/custom_contacts_panel.dart'; // Your existing panel
+0import '../widgets/custom_contacts_panel.dart'; // Your existing panel
 
 class ContactsScreen extends StatefulWidget {
   const ContactsScreen({Key? key}) : super(key: key);
@@ -72,7 +72,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
           if (contactId.isEmpty) {
             contactId = contact.phones.isNotEmpty ? contact.phones.first.number : "unknown_contact_${contact.hashCode}";
           }
-          chatProvider.switchToP2pChat(contactId, contact.displayName);
+          chatProvider.switchToP2pChat(contactId, contact.displayName,"");
           Navigator.pop(context); // Go back to MainChatHostScreen, which will show P2P
         },
       ),

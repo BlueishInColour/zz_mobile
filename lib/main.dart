@@ -7,6 +7,7 @@ import 'package:yt/firebase_options.dart';
 import 'auth_account_security/auth.dart';
 import 'chat/providers/chat_provider.dart';
 import 'chat/services/socket_service.dart';
+import 'chat/widgets/chat_view.dart';
 
 void main()async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,11 +20,8 @@ void main()async {
   runApp(
     MultiProvider(
       providers: [
-        Provider<SocketService>.value(value: socketService),
-        ChangeNotifierProvider(
-          create: (context) => ChatProvider(socketService),
-        ),
-        // Add NavigationProvider if you implement complex bottom nav logic
+        ChangeNotifierProvider(create: (_) => ChatProvider()),
+        // Add other providers: GlobalPanelStateProvider, ContactContextProvider, ChatsTabContentStateProvider
       ],
       child: const MyApp(),
     ),
@@ -66,5 +64,38 @@ class MyApp extends StatelessWidget {
       ),
       home: const AuthGate(),
     );
+  }
+}
+
+
+// Temporary loader to demonstrate switching chat contexts
+class ChatScreenLoader extends StatefulWidget {
+  @override
+  _ChatScreenLoaderState createState() => _ChatScreenLoaderState();
+}
+
+class _ChatScreenLoaderState extends State<ChatScreenLoader> {
+  @override
+  void initState() {
+    super.initState();
+    // Start with AI chat by default for this example
+    // In your full app, this would be controlled by ChatsTabContentStateProvider
+    // and the assistive prompt screen.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Provider.of<ChatProvider>(context, listen: false).switchToAiChat();
+      // Or uncomment below to test P2P
+      Provider.of<ChatProvider>(context, listen: false).switchToP2pChat(
+          "peer_xyz_789",
+          "John Doe",
+          "https://example.com/peer_avatar.png" // Can be null
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // In your actual app, this ChatView would be part of your
+    // TabScreenWrapper -> ChatsTabContentStateProvider logic.
+    return ChatView();
   }
 }
