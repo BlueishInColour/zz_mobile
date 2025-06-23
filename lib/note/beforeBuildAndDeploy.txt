@@ -1,0 +1,5 @@
+Run this commands first >>>>
+
+/home/pelumi/Development/flutter/bin/dart run flutter_launcher_icons:generate --override
+
+/home/pelumi/Development/flutter/bin/dart run flutter_native_splash:create

@@ -1,0 +1,53 @@
+name: yt
+description: "A new Flutter project."
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: ^3.8.1
+
+dependencies:
+  firebase_auth: ^5.6.0
+  firebase_core: ^3.14.0
+  firebase_ui_auth: ^1.17.0
+  firebase_ui_oauth_google: ^1.4.2
+  flutter:
+    sdk: flutter
+  flutter_native_splash: ^2.4.6
+  google_sign_in: ^6.3.0
+  flutter_contacts: ^1.1.7+1 # Check pub.dev for the latest version
+
+  permission_handler: ^11.0.0 # Check for the latest version
+  image_picker: ^1.0.7 # Check for latest
+  record: ^5.0.4       # Check for latest (simple audio recording)
+  audioplayers: ^5.2.1   # Check for latest (for playing audio)
+  path_provider: ^2.0.12 # For getting file paths
+  intl: ^0.20.2 # For date formatting if needed
+  socket_io_client: ^2.0.3 # Check for the latest version on pub.dev
+  provider: ^6.0.5       # For simple state management (optional, but good for larger apps)
+#  intl: ^0.18.1
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  flutter_launcher_icons: "^0.14.4"
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/icon.png
+    - assets/splash.png
+
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/icon.png"
+  min_sdk_android: 21 
+  adaptive_icon_foreground: "assets/icon.png"
+  adaptive_icon_background: "#ffffff"
+
+flutter_native_splash:
+  color: "#000000"
+#  background_image: "assets/splash.png"

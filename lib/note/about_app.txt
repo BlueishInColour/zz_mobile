@@ -1,0 +1,12 @@
+ZZ
+this is an ai powered tool for fashion designers
+it mainly functioins as the following
+
+- telephone book to access relative designers with chat system
+
+EACH CONTACT
+- ai chat, ask him to do anything about fahion
+- individual chats, group or team chats
+- status 24 hrs story post to capture audience
+- assistant to wotk on logo, banner, mockups, instagrams
+- accounting and bookkeepiing system where ai analyses the books
