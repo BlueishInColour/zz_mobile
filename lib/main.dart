@@ -4,10 +4,14 @@ import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:provider/provider.dart';
 import 'package:yt/firebase_options.dart';
 
+import 'package:google_fonts/google_fonts.dart';
+import 'package:yt/story/providers/story_provider.dart';
 import 'auth_account_security/auth.dart';
 import 'chat/providers/chat_provider.dart';
+import 'chat/providers/chats_tab_content_state_provider.dart';
 import 'chat/services/socket_service.dart';
 import 'chat/widgets/chat_view.dart';
+import 'jotter/providers/jotter_provider.dart';
 
 void main()async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,8 +24,13 @@ void main()async {
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => ChatProvider()),
-        // Add other providers: GlobalPanelStateProvider, ContactContextProvider, ChatsTabContentStateProvider
+        ChangeNotifierProvider(create: (_) => JotterProvider()),
+        ChangeNotifierProvider(create: (_) => ChatProvider()..loadUserProfile()), // Initialize and load user
+        ChangeNotifierProvider(create: (_) => StoryProvider()), // Initialize and load user
+
+        //  ENSURE THIS LINE IS PRESENT AND CORRECT  //
+        ChangeNotifierProvider(create: (_) => ChatsTabContentStateProvider()),
+        // Add any other global providers here
       ],
       child: const MyApp(),
     ),
@@ -60,7 +69,12 @@ class MyApp extends StatelessWidget {
                   side: BorderSide(width: 4)
             ))
           )
-        )
+        ),
+        textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme).copyWith(
+          bodyLarge: GoogleFonts.inter(textStyle: ThemeData.dark().textTheme.bodyLarge),
+          bodyMedium: GoogleFonts.inter(textStyle: ThemeData.dark().textTheme.bodyMedium),
+          displayLarge: GoogleFonts.inter(textStyle: ThemeData.dark().textTheme.displayLarge, fontWeight: FontWeight.bold),
+        ),
       ),
       home: const AuthGate(),
     );

@@ -1,43 +1,48 @@
 // models/chat_message.dart
-
-enum MessageSender { user, ai, system } // System for info messages like "User X joined"
+enum MessageSender { user, ai, system } // Added system for system messages
 enum MessageStatus { sending, sent, delivered, read, failed }
-enum MessageType { text, image, audio, video } // For future use
 
 class ChatMessage {
   final String id;
   final String text;
-  final String senderId; // ID of the user/AI who sent it
-  final String senderDisplayName; // Display name of sender
-  final String? senderAvatarUrl; // URL for avatar
+  final String senderId; // ID of the user or AI
   final DateTime timestamp;
-  final MessageSender senderType; // To differentiate AI/User/System easily
+  final MessageSender senderType;
   final MessageStatus status;
-  final MessageType messageType; // Default to text for now
-  // Add fields for image/audio URLs later
+
+  // Optional: Store display info directly, or resolve in UI
+  final String? senderDisplayName;
+  final String? senderAvatarUrl;
+
+  // Optional: For different types of content beyond text
+  // final MessageContentType contentType;
+  // final String? mediaUrl;
 
   ChatMessage({
     required this.id,
     required this.text,
     required this.senderId,
-    required this.senderDisplayName,
-    this.senderAvatarUrl,
     required this.timestamp,
-    this.senderType = MessageSender.user,
-    this.status = MessageStatus.sending,
-    this.messageType = MessageType.text,
+    required this.senderType,
+    required this.status,
+    this.senderDisplayName, // Can be set based on senderId + senderType
+    this.senderAvatarUrl,  // Can be set based on senderId + senderType
   });
 
-  // Example: Factory for creating a system message
-  factory ChatMessage.system(String text) {
+  // You might add copyWith methods here for easier updates
+  ChatMessage copyWith({
+    MessageStatus? status,
+    // ... other fields you might want to update
+  }) {
     return ChatMessage(
-      id: DateTime.now().millisecondsSinceEpoch.toString() + '_system',
+      id: id,
       text: text,
-      senderId: 'system',
-      senderDisplayName: 'System',
-      timestamp: DateTime.now(),
-      senderType: MessageSender.system,
-      status: MessageStatus.sent, // System messages are considered sent
+      senderId: senderId,
+      timestamp: timestamp,
+      senderType: senderType,
+      status: status ?? this.status,
+      senderDisplayName: senderDisplayName,
+      senderAvatarUrl: senderAvatarUrl,
     );
   }
 }

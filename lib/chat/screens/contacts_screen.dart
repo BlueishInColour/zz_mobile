@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter_contacts/flutter_contacts.dart'; // Assuming this is your contacts plugin
 
 import '../providers/chat_provider.dart';
-0import '../widgets/custom_contacts_panel.dart'; // Your existing panel
+import '../widgets/custom_contacts_panel.dart'; // Your existing panel
 
 class ContactsScreen extends StatefulWidget {
   const ContactsScreen({Key? key}) : super(key: key);
