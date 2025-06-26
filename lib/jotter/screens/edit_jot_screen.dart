@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/jotter_provider.dart';
 import '../models/jot_models.dart';
-import 'package:uuid/uuid.dart'; // For generating ID for new jots
-import 'package:collection/collection.dart'; // Make sure to import
+import 'package:uuid/uuid.dart';
+import 'package:collection/collection.dart';
+import 'view_jot_screen.dart'; // Import the ViewJotScreen
 
 class EditJotScreen extends StatefulWidget {
   final String? jotId; // If null, creating a new jot
@@ -24,11 +25,19 @@ class _EditJotScreenState extends State<EditJotScreen> {
 
   JotItem? _existingJot;
   bool _isNewJot = true;
-  String? _targetContactId; // The contact this jot is for
+  String? _targetContactId; // The contact this jot belongs to/will belong to
+  JotterContact? _associatedContact; // The contact object for avatar/name
+
+  bool _isLoading = true; // To handle async loading in initState
 
   @override
   void initState() {
     super.initState();
+    _loadJotData();
+  }
+
+  Future<void> _loadJotData() async {
+    setState(() => _isLoading = true);
     final jotterProvider = Provider.of<JotterProvider>(context, listen: false);
 
     if (widget.jotId != null) {
@@ -39,24 +48,53 @@ class _EditJotScreenState extends State<EditJotScreen> {
         _contentController.text = _existingJot!.textContent ?? "";
         _targetContactId = _existingJot!.contactUserId;
       } else {
-        // Jot not found, handle error or pop (e.g., if deleted)
-        WidgetsBinding.instance.addPostFrameCallback((_) {
+        // Jot not found
+        if (mounted) {
           Navigator.pop(context);
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text("Jot not found.")),
           );
-        });
+        }
+        return; // Stop further processing
       }
     } else {
       _isNewJot = true;
-      // If preselectedContactId is provided (from contact selection screen), use it.
-      // Otherwise, default to the currently selected contact in the provider,
-      // or finally, the current user if no contact is selected.
-      _targetContactId = widget.preselectedContactId ??
-          jotterProvider.selectedContact?.userId ??
-          jotterProvider.currentUserId;
-      _titleController.text = ""; // Start with an empty title for new jots
+      // Determine the target contact for the new jot
+      if (widget.preselectedContactId != null) {
+        _targetContactId = widget.preselectedContactId;
+      } else if (jotterProvider.selectedContact != null) {
+        _targetContactId = jotterProvider.selectedContact!.userId;
+      } else {
+        _targetContactId = jotterProvider.currentUserId; // Default to "My Jots"
+      }
+      // Title controller starts empty for new jots
     }
+
+    // Fetch the associated contact for AppBar display
+    if (_targetContactId != null) {
+      _associatedContact = jotterProvider.getContactById(_targetContactId!);
+      // If creating a new jot for self and getContactById doesn't explicitly return a "My Jots" contact
+      if (_associatedContact == null && _targetContactId == jotterProvider.currentUserId) {
+        _associatedContact = JotterContact(
+          userId: jotterProvider.currentUserId,
+          displayName: "My Jots", // Or your preferred term like "Myself"
+          avatarUrl: jotterProvider.currentUserAvatarUrl, // Assuming you have this
+        );
+      }
+    }
+
+    if (!mounted) return;
+
+    // If, after all checks, we don't have an associated contact for a jot, it's an issue.
+    if (_associatedContact == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Cannot load jot: Contact information is missing.")),
+      );
+      Navigator.pop(context);
+      return;
+    }
+
+    setState(() => _isLoading = false);
   }
 
   @override
@@ -67,190 +105,251 @@ class _EditJotScreenState extends State<EditJotScreen> {
   }
 
   void _saveJot() {
-    if (_formKey.currentState!.validate()) {
-      _formKey.currentState!.save();
-      final jotterProvider = Provider.of<JotterProvider>(context, listen: false);
+    if (!_formKey.currentState!.validate()) {
+      // Optionally show a message if validation fails (e.g., if you add validators)
+      // ScaffoldMessenger.of(context).showSnackBar(
+      //   const SnackBar(content: Text("Please fill in all required fields.")),
+      // );
+      return;
+    }
 
-      final String jotId = _isNewJot ? _uuid.v4() : _existingJot!.id;
-      final now = DateTime.now();
-
-      final JotItem jotToSave = JotItem(
-        id: jotId,
-        contactUserId: _targetContactId!, // Should be set in initState
-        title: _titleController.text.trim(),
-        textContent: _contentController.text.trim(),
-        // Media and checklist items will be handled later
-        mediaAttachments: _isNewJot ? [] : _existingJot?.mediaAttachments ?? [],
-        checklistItems: _isNewJot ? [] : _existingJot?.checklistItems ?? [],
-        createdAt: _isNewJot ? now : _existingJot!.createdAt,
-        updatedAt: now,
-        createdByUserId: _isNewJot ? jotterProvider.currentUserId : _existingJot?.createdByUserId ?? jotterProvider.currentUserId,
+    if (_targetContactId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Error: Cannot determine target contact for this jot.")),
       );
+      return;
+    }
 
-      jotterProvider.addOrUpdateJot(jotToSave).then((_) {
-        Navigator.pop(context); // Go back after saving
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_isNewJot ? "Jot created!" : "Jot updated!")),
+    final jotterProvider = Provider.of<JotterProvider>(context, listen: false);
+    final String jotIdToSave = _isNewJot ? _uuid.v4() : _existingJot!.id;
+    final now = DateTime.now();
+
+    final JotItem jotToSave = JotItem(
+      id: jotIdToSave,
+      contactUserId: _targetContactId!,
+      title: _titleController.text.trim().isNotEmpty ? _titleController.text.trim() : "Untitled Jot",
+      textContent: _contentController.text.trim(),
+      mediaAttachments: _isNewJot ? [] : _existingJot?.mediaAttachments ?? [],
+      checklistItems: _isNewJot ? [] : _existingJot?.checklistItems ?? [],
+      createdAt: _isNewJot ? now : _existingJot!.createdAt,
+      updatedAt: now,
+      createdByUserId: _isNewJot ? jotterProvider.currentUserId : (_existingJot?.createdByUserId ?? jotterProvider.currentUserId),
+    );
+
+    jotterProvider.addOrUpdateJot(jotToSave).then((_) {
+      if (mounted) {
+        // Instead of just popping, navigate to the ViewJotScreen
+        // Pop current EditJotScreen
+        Navigator.pop(context);
+        // Then push ViewJotScreen. If coming from ViewJotScreen (edit), this replaces it.
+        // If coming from New Jot, it pushes ViewJotScreen on top of the list screen.
+        Navigator.pushReplacement( // Use pushReplacement if you always want ViewScreen to replace EditScreen in stack
+          context,
+          MaterialPageRoute(
+            builder: (context) => ViewJotScreen(jotId: jotIdToSave),
+          ),
         );
-      }).catchError((error) {
+        // Optional: show a confirmation SnackBar on the ViewJotScreen after redirect,
+        // or pass a parameter to ViewJotScreen to show it.
+        // For simplicity, we can show it briefly before navigating if needed,
+        // but it's often better on the destination screen.
+        // ScaffoldMessenger.of(context).showSnackBar(
+        //   SnackBar(content: Text(_isNewJot ? "Jot created!" : "Jot updated!")),
+        // );
+      }
+    }).catchError((error) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("Error saving jot: $error")),
         );
-      });
-    }
+      }
+    });
   }
 
-  void _deleteJot() {
-    if (_existingJot != null) {
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text("Delete Jot?"),
-          content: const Text("Are you sure you want to delete this jot? This action cannot be undone."),
-          actions: [
-            TextButton(
-              child: const Text("Cancel"),
-              onPressed: () => Navigator.of(ctx).pop(),
-            ),
-            TextButton(
-              child: const Text("Delete", style: TextStyle(color: Colors.red)),
-              onPressed: () {
-                Navigator.of(ctx).pop(); // Close dialog
-                Provider.of<JotterProvider>(context, listen: false)
-                    .deleteJot(_existingJot!.id)
-                    .then((_) {
-                  Navigator.pop(context); // Go back from edit screen
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Jot deleted")),
-                  );
-                });
-              },
-            ),
-          ],
-        ),
-      );
-    }
-  }
-
+  // Delete button is removed from Edit screen, it's better on ViewJotScreen
+  // void _deleteJot() { ... }
 
   @override
   Widget build(BuildContext context) {
-    // If jot wasn't found in initState (for an existing jotId), don't build the form.
-    if (!_isNewJot && _existingJot == null) {
+    final theme = Theme.of(context);
+
+    if (_isLoading) {
       return Scaffold(
-        appBar: AppBar(title: const Text("Error")),
-        body: const Center(child: Text("Jot could not be loaded.")),
+        appBar: AppBar(title: Text(_isNewJot ? "New Jot" : "Edit Jot")),
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
-    // Determine the contact name for the AppBar
-    String appBarTitle = _isNewJot ? "New Jot" : "Edit Jot";
-    final provider = Provider.of<JotterProvider>(context, listen: false);
-    JotterContact? associatedContact;
-    if (_targetContactId != null) {
-      final contactsList = provider.contactsForPanel;
-      if (_targetContactId == provider.currentUserId) {
-        // For current user, we want to ensure "My Jots" is used if not found by specific ID for some reason
-        // or if the contactsForPanel getter itself provides it.
-        // The current logic for contactsForPanel in JotterProvider should already ensure
-        // the first item is "My Jots" if the current user is selected or has no specific contact entry.
-        associatedContact = contactsList.firstWhereOrNull((c) => c.userId == provider.currentUserId);
-        // If, for some strange reason, it's still null, default to a "My Jots" instance.
-        associatedContact ??= JotterContact(userId: provider.currentUserId, displayName: "My Jots");
-
-      } else {
-        associatedContact = contactsList.firstWhereOrNull((c) => c.userId == _targetContactId);
-        // If associatedContact is null here, it means the contactId provided
-        // doesn't exist in the panel. The AppBar title will then fall back to "New Jot" / "Edit Jot".
-        // You might want to log this scenario if it's unexpected.
-        if (associatedContact == null) {
-          print("Warning: Jot targetContactId '$_targetContactId' not found in contactsForPanel.");
-        }
-      }
+    // This check is important after _isLoading is false
+    if (_associatedContact == null || (!_isNewJot && _existingJot == null)) {
+      // This case should ideally be caught by _loadJotData and lead to a pop
+      return Scaffold(
+          appBar: AppBar(title: Text(_isNewJot ? "New Jot" : "Error")),
+          body: const Center(child: Text("Could not load jot data.")));
     }
 
 
-    if (associatedContact != null) {
-      appBarTitle = _isNewJot ? "New Jot for ${associatedContact.displayName}" : "Edit Jot for ${associatedContact.displayName}";
-      if (associatedContact.displayName == "My Jots") {
-        appBarTitle = _isNewJot ? "New Jot for Myself" : "Edit My Jot";
-      }
+    String displayName = _associatedContact!.displayName;
+    // Customize "My Jots" display name if needed
+    if (_associatedContact!.userId == Provider.of<JotterProvider>(context, listen: false).currentUserId &&
+        (_associatedContact!.displayName == "My Jots" || _associatedContact!.displayName == "Myself")) {
+      displayName = "Myself"; // Or your preferred term like "My Jots"
     }
+
+    String appBarDynamicTitle = _isNewJot
+        ? "New Jot for $displayName"
+        : (_titleController.text.trim().isNotEmpty ? _titleController.text.trim() : "Untitled Jot");
 
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(appBarTitle),
-        actions: [
-          if (!_isNewJot)
-            IconButton(
-              icon: const Icon(Icons.delete_outline),
-              tooltip: "Delete Jot",
-              onPressed: _deleteJot,
+        leading: IconButton(
+          icon: const Icon(Icons.close), // More appropriate for an edit/create modal/screen
+          tooltip: "Cancel",
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Row(
+          children: [
+            CircleAvatar(
+              radius: 16,
+              backgroundImage: (_associatedContact?.avatarUrl != null && _associatedContact!.avatarUrl!.isNotEmpty)
+                  ? NetworkImage(_associatedContact!.avatarUrl!)
+                  : null,
+              child: (_associatedContact?.avatarUrl == null || _associatedContact!.avatarUrl!.isEmpty)
+                  ? Text(
+                _associatedContact!.displayName.isNotEmpty ? _associatedContact!.displayName[0].toUpperCase() : "?",
+                style: TextStyle(fontSize: 14, color: theme.colorScheme.onSecondaryContainer),
+              )
+                  : null,
+              backgroundColor: theme.colorScheme.secondaryContainer,
             ),
-          IconButton(
-            icon: const Icon(Icons.save_alt_rounded),
-            tooltip: "Save Jot",
-            onPressed: _saveJot,
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                appBarDynamicTitle,
+                style: const TextStyle(fontSize: 18),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+        elevation: 0.5,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8.0), // Add some padding
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.check_rounded, size: 20),
+              label: const Text("Save"),
+              onPressed: _saveJot,
+              style: ElevatedButton.styleFrom(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8)
+              ),
+            ),
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              TextFormField(
-                controller: _titleController,
-                decoration: const InputDecoration(
-                  labelText: "Title",
-                  border: OutlineInputBorder(),
-                  hintText: "Enter the main topic of your jot",
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    TextFormField(
+                      controller: _titleController,
+                      decoration: InputDecoration(
+                        border: InputBorder.none,
+                        hintText: "Title...",
+                        hintStyle: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 28,
+                          color: theme.hintColor.withOpacity(0.6),
+                        ),
+                        counterText: "",
+                      ),
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 28,
+                          color: theme.textTheme.titleLarge?.color),
+                      // validator: (value) { // Validation is optional here as we default title on save
+                      //   if (value == null || value.trim().isEmpty) {
+                      //     return 'Title cannot be empty'; // Or handle silently
+                      //   }
+                      //   return null;
+                      // },
+                      textCapitalization: TextCapitalization.sentences,
+                      maxLength: 80,
+                      onChanged: (value) {
+                        // To update AppBar title dynamically as user types (optional)
+                        if (!_isNewJot) setState(() {});
+                      },
+                    ),
+                    const SizedBox(height: 8.0),
+                    TextFormField(
+                      controller: _contentController,
+                      decoration: InputDecoration(
+                        border: InputBorder.none,
+                        hintText: "Start writing...",
+                        hintStyle: TextStyle(
+                          fontSize: 18,
+                          color: theme.hintColor.withOpacity(0.6),
+                        ),
+                      ),
+                      style: TextStyle(fontSize: 18, height: 1.5, color: theme.textTheme.bodyLarge?.color),
+                      maxLines: null,
+                      keyboardType: TextInputType.multiline,
+                      textCapitalization: TextCapitalization.sentences,
+                    ),
+                  ],
                 ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Please enter a title.';
-                  }
-                  return null;
-                },
-                textCapitalization: TextCapitalization.sentences,
               ),
-              const SizedBox(height: 16.0),
-              TextFormField(
-                controller: _contentController,
-                decoration: const InputDecoration(
-                  labelText: "Content",
-                  hintText: "Jot down your notes, ideas, measurements...",
-                  border: OutlineInputBorder(),
-                  alignLabelWithHint: true, // Good for multi-line
-                ),
-                maxLines: 10, // Adjust as needed
-                textCapitalization: TextCapitalization.sentences,
-                // No validator for content, can be empty
-              ),
-              const SizedBox(height: 24.0),
-              // --- Placeholder for Media/Checklist Buttons ---
-              const Text(
-                "Attachments (Coming Soon):",
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  IconButton(icon: const Icon(Icons.add_a_photo_outlined), onPressed: () {/* TODO */}, tooltip: "Add Image"),
-                  IconButton(icon: const Icon(Icons.videocam_outlined), onPressed: () {/* TODO */}, tooltip: "Add Video"),
-                  IconButton(icon: const Icon(Icons.checklist_rtl_rounded), onPressed: () {/* TODO */}, tooltip: "Add Checklist"),
-                  IconButton(icon: const Icon(Icons.mic_none_outlined), onPressed: () {/* TODO */}, tooltip: "Add Audio"),
-                ],
-              ),
-              // --- Placeholder for displaying existing media/checklists ---
-            ],
+            ),
           ),
-        ),
+          // Bottom Action Bar (remains the same)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+            decoration: BoxDecoration(
+                color: theme.bottomAppBarTheme.color ?? theme.colorScheme.surface,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 4,
+                    offset: const Offset(0, -2),
+                  ),
+                ],
+                border: Border(
+                    top: BorderSide(
+                      color: theme.dividerColor.withOpacity(0.5),
+                      width: 0.5,
+                    ))),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: <Widget>[
+                _buildActionButton(context, Icons.add_a_photo_outlined, "Image", () {/* TODO */}),
+                _buildActionButton(context, Icons.videocam_outlined, "Video", () {/* TODO */}),
+                _buildActionButton(context, Icons.checklist_rtl_rounded, "Checklist", () {/* TODO */}),
+                _buildActionButton(context, Icons.mic_none_outlined, "Audio", () {/* TODO */}),
+                _buildActionButton(context, Icons.palette_outlined, "Style", () {/* TODO */}),
+              ],
+            ),
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _buildActionButton(BuildContext context, IconData icon, String tooltip, VoidCallback onPressed) {
+    return IconButton(
+      icon: Icon(icon),
+      iconSize: 26,
+      tooltip: tooltip,
+      onPressed: onPressed,
+      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+      splashRadius: 24,
     );
   }
 }

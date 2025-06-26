@@ -1,165 +1,188 @@
 // providers/jotter_provider.dart
-import 'package:flutter/material.dart';
-import '../models/jot_models.dart'; // Your data models
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
-
-const String _currentUserId = "currentUserDemoId";
+import 'package:collection/collection.dart'; // For firstWhereOrNull
+import '../models/jot_models.dart';
 
 class JotterProvider with ChangeNotifier {
-  final Uuid _uuid = Uuid();
-
-  List<JotterContact> _contacts = [];
-  List<JotItem> _allJots = [];
-
+  // --- Private Properties ---
+  List<JotItem> _jots = [];
+  List<JotterContact> _contacts = []; // This will be the raw list of external contacts
   JotterContact? _selectedContact;
   bool _isLoading = false;
-  bool _isPanelExpanded = true;
+  bool _isPanelExpanded = false;
 
-  List<JotterContact> get contactsForPanel {
-    List<JotterContact> sortedContacts = List.from(_contacts);
-    JotterContact? currentUserContact;
-    int currentUserIndex = sortedContacts.indexWhere((c) => c.userId == _currentUserId);
-
-    if (currentUserIndex != -1) {
-      currentUserContact = sortedContacts.removeAt(currentUserIndex);
-    } else {
-      currentUserContact = JotterContact(userId: _currentUserId, displayName: "My Jots");
-    }
-
-    sortedContacts.sort((a, b) {
-      if (a.lastJotActivity == null && b.lastJotActivity == null) return 0;
-      if (a.lastJotActivity == null) return 1;
-      if (b.lastJotActivity == null) return -1;
-      return b.lastJotActivity!.compareTo(a.lastJotActivity!);
-    });
-    return [currentUserContact, ...sortedContacts];
-  }
-
-  JotterContact? get selectedContact => _selectedContact;
-
-  List<JotItem> get jotsForSelectedContact {
-    List<JotItem> filteredJots;
-
-    if (_selectedContact == null) {
-      if (contactsForPanel.isNotEmpty && contactsForPanel.first.userId == _currentUserId) {
-        filteredJots = _allJots
-            .where((jot) => jot.contactUserId == _currentUserId)
-            .toList(); // Convert to List first
-      } else {
-        return [];
-      }
-    } else {
-      filteredJots = _allJots
-          .where((jot) => jot.contactUserId == _selectedContact!.userId)
-          .toList(); // Convert to List first
-    }
-    // Now call the extension method on the List
-    return filteredJots.orderByUpdatedAtDesc();
-  }
+  // --- Public Getters ---
+  String get currentUserId => "user_me"; // Example current user ID
+  String? get currentUserAvatarUrl => "https://i.pravatar.cc/150?u=user_me"; // Example, replace with actual
 
   bool get isLoading => _isLoading;
   bool get isPanelExpanded => _isPanelExpanded;
-  String get currentUserId => _currentUserId;
+  JotterContact? get selectedContact => _selectedContact;
 
-  JotterProvider() {
-    _loadInitialData();
+  /// Returns a list of contacts to be displayed in the panel,
+  /// including a special "My Jots" entry for the current user.
+  List<JotterContact> get contactsForPanel {
+    // Create the "My Jots" contact object for the panel
+    final selfContact = JotterContact(
+      userId: currentUserId,
+      displayName: "My Jots",
+      avatarUrl: currentUserAvatarUrl, // Use the getter for consistency
+      // No jotCount here, as it's a special entry.
+      // You could calculate it if needed: _jots.where((j) => j.contactUserId == currentUserId).length
+    );
+
+    // Filter out the current user from the main contacts list (if they exist there)
+    // and then insert the special 'selfContact' at the beginning.
+    List<JotterContact> panelContacts = _contacts
+        .where((contact) => contact.userId != currentUserId)
+        .toList();
+    panelContacts.insert(0, selfContact);
+
+    return panelContacts;
   }
 
-  Future<void> _loadInitialData() async {
+  /// Returns jots filtered for the currently selected contact in the panel.
+  /// If no contact is selected (shouldn't happen after init), defaults to "My Jots".
+  List<JotItem> get jotsForSelectedContact {
+    final targetId = _selectedContact?.userId ?? currentUserId;
+    return _jots
+        .where((jot) => jot.contactUserId == targetId)
+        .toList()
+      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt)); // Sort by most recent
+  }
+
+  /// Returns all jots (primarily for internal use or if needed elsewhere).
+  List<JotItem> get allJots => List.unmodifiable(_jots);
+
+
+  // --- Constructor & Initializer ---
+  JotterProvider() {
+    _loadInitialDataAndSelectSelf();
+  }
+
+  Future<void> _loadInitialDataAndSelectSelf() async {
     _isLoading = true;
-    notifyListeners();
-    await Future.delayed(const Duration(milliseconds: 800));
+    // notifyListeners(); // Consider if you want an immediate loading state update
 
+    // Simulate loading external contacts (excluding the current user explicitly)
+    // In a real app, this would be an API call or database query.
+    await Future.delayed(const Duration(milliseconds: 500)); // Simulate network
     _contacts = [
-      JotterContact(userId: "contact_jane", displayName: "Jane Doe", avatarUrl: "https://i.pravatar.cc/150?img=5", lastJotActivity: DateTime.now().subtract(const Duration(hours: 2))),
-      JotterContact(userId: "contact_john", displayName: "John Smith", avatarUrl: "https://i.pravatar.cc/150?img=12", lastJotActivity: DateTime.now().subtract(const Duration(days: 1))),
+      JotterContact(userId: "contact_1", displayName: "Alice Wonderland", avatarUrl: "https://i.pravatar.cc/150?img=1"),
+      JotterContact(userId: "contact_2", displayName: "Bob The Builder", avatarUrl: "https://i.pravatar.cc/150?img=2"),
+      JotterContact(userId: "contact_3", displayName: "Charlie Brown", avatarUrl: "https://i.pravatar.cc/150?img=3"),
+      // Note: currentUserId ("user_me") is NOT in this list.
+      // The "My Jots" entry is dynamically added by contactsForPanel.
     ];
 
-    _allJots = [
-      JotItem(id: _uuid.v4(), contactUserId: _currentUserId, title: "My Fashion Sketch Idea", textContent: "A flowing gown with intricate lace details...", createdAt: DateTime.now().subtract(const Duration(minutes: 30)), updatedAt: DateTime.now().subtract(const Duration(minutes: 30))),
-      JotItem(id: _uuid.v4(), contactUserId: _currentUserId, title: "Fabric Swatches to Check", textContent: "Silk, Velvet, Cotton blend for the summer collection.", createdAt: DateTime.now().subtract(const Duration(hours: 5)), updatedAt: DateTime.now().subtract(const Duration(hours: 5))),
-      JotItem(id: _uuid.v4(), contactUserId: "contact_jane", title: "Meeting Notes with Jane", textContent: "Discussed mood board and color palette. She liked the teal inspiration.", createdAt: DateTime.now().subtract(const Duration(hours: 1)), updatedAt: DateTime.now().subtract(const Duration(hours: 1))),
-      JotItem(id: _uuid.v4(), contactUserId: "contact_john", title: "Measurements for John's Suit", textContent: "Chest: 40, Waist: 32, Inseam: 30. Needs adjustment on shoulder.", createdAt: DateTime.now().subtract(const Duration(days: 2)), updatedAt: DateTime.now().subtract(const Duration(days: 2))),
+    // Simulate loading jots
+    final Uuid uuid = Uuid();
+    final now = DateTime.now();
+    _jots = [
+      JotItem(id: uuid.v4(), contactUserId: currentUserId, title: "My Grocery List", textContent: "Milk, Eggs, Bread, Cheese.", createdAt: now.subtract(const Duration(days: 1)), updatedAt: now.subtract(const Duration(days: 1)), createdByUserId: currentUserId),
+      JotItem(id: uuid.v4(), contactUserId: currentUserId, title: "My Meeting Notes", textContent: "Project X discussion.", createdAt: now.subtract(const Duration(hours: 5)), updatedAt: now.subtract(const Duration(hours: 4)), createdByUserId: currentUserId),
+      JotItem(id: uuid.v4(), contactUserId: "contact_1", title: "Ideas for Alice", textContent: "Gift ideas, project thoughts.", createdAt: now.subtract(const Duration(days: 2)), updatedAt: now.subtract(const Duration(days: 2)), createdByUserId: currentUserId),
+      JotItem(id: uuid.v4(), contactUserId: currentUserId, title: "My Workout Plan", textContent: "Gym session details.", createdAt: now.subtract(const Duration(hours: 10)), updatedAt: now.subtract(const Duration(hours: 10)), createdByUserId: currentUserId),
+      JotItem(id: uuid.v4(), contactUserId: "contact_2", title: "Bob's Project Specs", textContent: "Requirements for the new shed.", createdAt: now.subtract(const Duration(days: 3)), updatedAt: now.subtract(const Duration(days: 2, hours: 5)), createdByUserId: currentUserId),
     ];
 
-    if (contactsForPanel.isNotEmpty) {
+    // Select "My Jots" by default after data is loaded.
+    // We find it in the generated `contactsForPanel` list.
+    _selectedContact = contactsForPanel.firstWhereOrNull((c) => c.userId == currentUserId);
+
+    // Fallback if "My Jots" somehow wasn't found (shouldn't happen with current logic)
+    if (_selectedContact == null && contactsForPanel.isNotEmpty) {
       _selectedContact = contactsForPanel.first;
+    } else if (_selectedContact == null) {
+      // Absolute fallback: create a temporary self contact if panel is empty (edge case)
+      _selectedContact = JotterContact(userId: currentUserId, displayName: "My Jots", avatarUrl: currentUserAvatarUrl);
     }
 
     _isLoading = false;
-    notifyListeners();
+    notifyListeners(); // Notify that initial data is ready and selected contact is set
   }
 
-  void selectContact(JotterContact contact) {
-    _selectedContact = contact;
-    notifyListeners();
-  }
-
+  // --- UI Interaction Methods ---
   void togglePanel() {
     _isPanelExpanded = !_isPanelExpanded;
     notifyListeners();
   }
 
-  Future<void> addOrUpdateJot(JotItem jot) async {
-    _isLoading = true;
-    notifyListeners();
-    await Future.delayed(const Duration(milliseconds: 300));
+  void selectContact(JotterContact contact) {
+    if (_selectedContact?.userId != contact.userId) {
+      _selectedContact = contact;
+      // Potentially close panel when a contact is selected, depending on UX preference
+      // if (_isPanelExpanded) {
+      //   _isPanelExpanded = false;
+      // }
+      notifyListeners();
+    }
+  }
 
-    final index = _allJots.indexWhere((j) => j.id == jot.id);
-    final now = DateTime.now();
-    jot.updatedAt = now; // Ensure updatedAt is current
-
+  // --- Data Manipulation Methods ---
+  Future<void> addOrUpdateJot(JotItem jot, {bool silent = false}) async {
+    final index = _jots.indexWhere((j) => j.id == jot.id);
     if (index != -1) {
-      _allJots[index] = jot;
+      _jots[index] = jot; // Update existing
     } else {
-      jot.createdAt = now; // Set createdAt for new jots
-      _allJots.add(jot);
+      _jots.add(jot); // Add new
     }
 
-    final contactIndex = _contacts.indexWhere((c) => c.userId == jot.contactUserId);
-    if (contactIndex != -1) {
-      _contacts[contactIndex].lastJotActivity = now;
+    if (!silent) {
+      // If the jot's contact is different from the currently selected one,
+      // update the selected contact to show the newly added/updated jot.
+      if (_selectedContact?.userId != jot.contactUserId) {
+        final contactToSelect = getContactById(jot.contactUserId);
+        if (contactToSelect != null) {
+          _selectedContact = contactToSelect;
+        } else {
+          // This case means a jot was added for a contact not in the panel.
+          // This shouldn't happen if jots are always for existing contacts or "My Jots".
+          // If it can, you might need to add a temporary contact or handle it.
+          print("Warning: Jot added/updated for contact '${jot.contactUserId}', which is not in the panel. Selecting 'My Jots'.");
+          _selectedContact = getContactById(currentUserId); // Fallback to "My Jots"
+        }
+      }
+      notifyListeners();
     }
-
-    _isLoading = false;
-    notifyListeners();
   }
 
   Future<void> deleteJot(String jotId) async {
+    _jots.removeWhere((j) => j.id == jotId);
+    notifyListeners();
+  }
+
+  // --- Data Accessor Methods ---
+
+  /// Retrieves a specific jot by its ID.
+  JotItem? getJotById(String jotId) {
+    return _jots.firstWhereOrNull((j) => j.id == jotId);
+  }
+
+  /// Retrieves contact details by user ID.
+  /// This will check the main `_contacts` list and also handle the `currentUserId` case.
+  JotterContact? getContactById(String userId) {
+    if (userId == currentUserId) {
+      return JotterContact(
+        userId: currentUserId,
+        displayName: "My Jots", // Or "Myself" / user's actual name if available
+        avatarUrl: currentUserAvatarUrl,
+      );
+    }
+    return _contacts.firstWhereOrNull((contact) => contact.userId == userId);
+  }
+
+  /// Placeholder for a method to reload jots, e.g., on pull-to-refresh.
+  /// You might want to make this more specific, like `reloadJotsForSelectedContact()`.
+  Future<void> refreshJots() async {
     _isLoading = true;
     notifyListeners();
-    await Future.delayed(const Duration(milliseconds: 300));
-    _allJots.removeWhere((j) => j.id == jotId);
+    // Simulate fetching new data
+    await Future.delayed(const Duration(seconds: 1));
+    // Here you would re-fetch _jots and potentially _contacts
+    // For now, just end loading state
     _isLoading = false;
     notifyListeners();
-  }
-
-  JotItem? getJotById(String jotId) {
-    try {
-      return _allJots.firstWhere((jot) => jot.id == jotId);
-    } catch (e) {
-      return null;
-    }
-  }
-}
-
-// Helper extension for sorting (can be in a separate utils file)
-// This extension works on a List<T> and sorts it in place, then returns it.
-extension ListUpdateSort<T> on List<T> {
-  List<T> orderByUpdatedAtDesc() {
-    // Sort logic needs to ensure it's comparing JotItems
-    if (T == JotItem) {
-      this.sort((a, b) {
-        // Cast to JotItem to access updatedAt
-        final JotItem jotA = a as JotItem;
-        final JotItem jotB = b as JotItem;
-        return jotB.updatedAt.compareTo(jotA.updatedAt);
-      });
-    } else {
-      // Optionally handle or throw error if called on a list of non-JotItems
-      // For now, it will only work if T is JotItem
-      print("Warning: orderByUpdatedAtDesc called on a list that is not of JotItem type.");
-    }
-    return this;
   }
 }

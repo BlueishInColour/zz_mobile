@@ -30,6 +30,8 @@ dependencies:
   provider: ^6.0.5       # For simple state management (optional, but good for larger apps)
 #  intl: ^0.18.1
   uuid: ^4.3.3
+  flutter_svg: ^2.2.0
+  flutter_staggered_grid_view: ^0.7.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -42,8 +44,72 @@ flutter:
   assets:
     - assets/icon.png
     - assets/splash.png
+    - assets/svgs/
 
 
+  fonts:
+    - family: HelveticaNeue
+      fonts:
+        # Regular (Roman is often used as the regular style)
+        - asset: assets/fonts/HelveticaNeueRoman.otf
+          weight: 400 # Normal/Regular
+        - asset: assets/fonts/HelveticaNeueItalic.ttf # Assuming this .ttf is your regular italic
+          weight: 400 # Normal/Regular
+          style: italic
+
+        # Thin
+        - asset: assets/fonts/HelveticaNeueThin.otf
+          weight: 100
+        - asset: assets/fonts/HelveticaNeueThinItalic.otf
+          weight: 100
+          style: italic
+
+        # UltraLight
+        - asset: assets/fonts/HelveticaNeueUltraLight.otf
+          weight: 200
+        - asset: assets/fonts/HelveticaNeueUltraLightItalic.otf
+          weight: 200
+          style: italic
+
+        # Light
+        - asset: assets/fonts/HelveticaNeueLight.otf
+          weight: 300
+        - asset: assets/fonts/HelveticaNeueLightItalic.otf
+          weight: 300
+          style: italic
+
+        # Medium
+        - asset: assets/fonts/HelveticaNeueMedium.otf
+          weight: 500
+        - asset: assets/fonts/HelveticaNeueMediumItalic.otf
+          weight: 500
+          style: italic
+
+        # Bold
+        - asset: assets/fonts/HelveticaNeueBold.otf
+          weight: 700 # Standard Bold
+        - asset: assets/fonts/HelveticaNeueBoldItalic.otf
+          weight: 700 # Standard Bold
+          style: italic
+
+        # Heavy
+        - asset: assets/fonts/HelveticaNeueHeavy.otf
+          weight: 800 # Or 900, Heavy is sometimes mapped to 800 or 900
+        - asset: assets/fonts/HelveticaNeueHeavyItalic.otf
+          weight: 800 # Or 900
+          style: italic
+
+        # Black
+        - asset: assets/fonts/HelveticaNeueBlack.otf
+          weight: 900 # Black is typically the heaviest
+        - asset: assets/fonts/HelveticaNeueBlackItalic.otf
+          weight: 900 # Black is typically the heaviest
+          style: italic
+
+    # You could define other font families here if needed
+    # - family: AnotherFont
+    #   fonts:
+    #     - asset: assets/fonts/AnotherFont-Regular.ttf
 flutter_launcher_icons:
   android: true # can be true, false, or "launcher_icon"
   ios: true

@@ -1,7 +1,7 @@
 // widgets/draggable_contacts_panel_for_chat.dart
 import 'package:flutter/material.dart';
 
-// Dummy Contact class for example (ensure you have your actual Contact model)
+// Dummy Contact class (ensure you have your actual Contact model)
 class Contact {
   final String id;
   final String displayName;
@@ -17,14 +17,16 @@ class DraggableContactsPanelForChat extends StatefulWidget {
   final double panelWidthCollapsed;
   final double panelWidthExpanded;
   final bool isInitiallyExpanded;
+  final Function(bool)? onExpansionChanged; // <<< NEW CALLBACK
 
   const DraggableContactsPanelForChat({
     Key? key,
     required this.contacts,
     required this.onContactSelected,
-    this.panelWidthCollapsed = 70.0, // Adjusted default
+    this.panelWidthCollapsed = 70.0,
     this.panelWidthExpanded = 250.0,
     this.isInitiallyExpanded = false,
+    this.onExpansionChanged, // <<< NEW PARAMETER
   }) : super(key: key);
 
   @override
@@ -34,10 +36,7 @@ class DraggableContactsPanelForChat extends StatefulWidget {
 class _DraggableContactsPanelForChatState extends State<DraggableContactsPanelForChat> {
   late bool _isExpanded;
   double _currentWidth = 0;
-  final double _avatarRadius = 20.0; // Slightly increased for better visibility
-  final double _collapsedPadding = 8.0;
-  final double _buttonSize = 40.0; // Size of the toggle button
-  final double _buttonMargin = 8.0; // Margin for the button from panel edges
+  // ... other variables ...
 
   @override
   void initState() {
@@ -50,9 +49,12 @@ class _DraggableContactsPanelForChatState extends State<DraggableContactsPanelFo
     setState(() {
       _isExpanded = !_isExpanded;
       _currentWidth = _isExpanded ? widget.panelWidthExpanded : widget.panelWidthCollapsed;
+      widget.onExpansionChanged?.call(_isExpanded); // <<< CALL THE CALLBACK
     });
   }
 
+  // ... rest of the widget build method ...
+  // (No changes needed in the build method of DraggableContactsPanelForChat for this specific fix)
   @override
   Widget build(BuildContext context) {
     Color panelBackgroundColor = Theme.of(context).brightness == Brightness.dark
@@ -63,24 +65,16 @@ class _DraggableContactsPanelForChatState extends State<DraggableContactsPanelFo
       duration: const Duration(milliseconds: 250),
       curve: Curves.easeInOut,
       width: _currentWidth,
-      decoration: BoxDecoration( // Use decoration for better control over background and potential borders
+      decoration: BoxDecoration(
         color: panelBackgroundColor,
-        // Optional: Add a subtle border if you want to distinguish it from the background
-        // border: Border(
-        //   right: BorderSide(
-        //     color: Theme.of(context).dividerColor.withOpacity(0.5),
-        //     width: 1.0,
-        //   ),
-        // ),
       ),
       child: Stack(
-        clipBehavior: Clip.none, // Allow button to potentially overflow slightly if needed, though usually not
+        clipBehavior: Clip.none,
         children: [
-          // Content of the panel (ListView of contacts)
           Positioned.fill(
-            bottom: _buttonSize + _buttonMargin, // Leave space for the button at the bottom
+            bottom: widget.panelWidthCollapsed > 0 ? 40.0 + 8.0 * 2 : 8.0, // Space for button
             child: ListView.builder(
-              padding: EdgeInsets.only(top: _buttonMargin), // Add some top padding if button is near top items
+              padding: EdgeInsets.only(top: 8.0),
               itemCount: widget.contacts.length,
               itemBuilder: (context, index) {
                 final contact = widget.contacts[index];
@@ -93,28 +87,23 @@ class _DraggableContactsPanelForChatState extends State<DraggableContactsPanelFo
                       if (_isExpanded) {
                         widget.onContactSelected(contact);
                       } else {
-                        // When collapsed, tapping a contact avatar could also expand the panel
                         _toggleExpand();
-                        // Optionally, you could also select the contact after expanding
-                        // Future.delayed(const Duration(milliseconds: 260), () {
-                        //   widget.onContactSelected(contact);
-                        // });
+                        // widget.onContactSelected(contact); // Optionally select immediately after expand
                       }
                     },
                     child: Container(
                       padding: EdgeInsets.symmetric(
-                        vertical: _isExpanded ? 10.0 : _collapsedPadding / 2, // Reduced vertical padding for collapsed
-                        horizontal: _isExpanded ? 16.0 : _collapsedPadding,
+                        vertical: _isExpanded ? 10.0 : 8.0 / 2,
+                        horizontal: _isExpanded ? 16.0 : 8.0,
                       ),
-                      // Fixed height for collapsed items to ensure consistency
-                      height: _isExpanded ? null : (_avatarRadius * 2) + (_collapsedPadding * 2),
+                      height: _isExpanded ? null : (20.0 * 2) + (8.0 * 2),
                       child: Align(
                         alignment: _isExpanded ? Alignment.centerLeft : Alignment.center,
                         child: _isExpanded
                             ? Row(
                           children: [
                             CircleAvatar(
-                              radius: _avatarRadius,
+                              radius: 20.0,
                               backgroundImage: contact.avatarUrl != null ? NetworkImage(contact.avatarUrl!) : null,
                               child: contact.avatarUrl == null ? Text(contact.displayName[0].toUpperCase(), style: TextStyle(color: Theme.of(context).colorScheme.onSecondaryContainer)) : null,
                               backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
@@ -129,10 +118,10 @@ class _DraggableContactsPanelForChatState extends State<DraggableContactsPanelFo
                             ),
                           ],
                         )
-                            : Tooltip( // Add tooltip for collapsed view
+                            : Tooltip(
                           message: contact.displayName,
                           child: CircleAvatar(
-                            radius: _avatarRadius,
+                            radius: 20.0,
                             backgroundImage: contact.avatarUrl != null ? NetworkImage(contact.avatarUrl!) : null,
                             child: contact.avatarUrl == null ? Text(contact.displayName[0].toUpperCase(), style: TextStyle(color: Theme.of(context).colorScheme.onSecondaryContainer)) : null,
                             backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
@@ -145,40 +134,36 @@ class _DraggableContactsPanelForChatState extends State<DraggableContactsPanelFo
               },
             ),
           ),
-
-          // REMOVED the old GestureDetector for dragging and the black line Container
-
-          // NEW Toggle Button Positioning
-          AnimatedPositioned(
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeInOut,
-            bottom: _buttonMargin,
-            // Align to center when collapsed, to right when expanded
-            left: _isExpanded ? null : (_currentWidth - _buttonSize) / 2,
-            right: _isExpanded ? _buttonMargin : null,
-            child: Material(
-              color: Theme.of(context).colorScheme.secondary.withOpacity(0.8),
-              elevation: 2,
-              shape: const CircleBorder(),
-              clipBehavior: Clip.antiAlias,
-              child: SizedBox(
-                width: _buttonSize,
-                height: _buttonSize,
-                child: IconButton(
-                  icon: Icon(
-                    _isExpanded ? Icons.chevron_left : Icons.chevron_right,
-                    size: _buttonSize * 0.5, // Make icon proportional to button
+          if (widget.panelWidthCollapsed > 0) // Only show button if there's a collapsed state
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeInOut,
+              bottom: 8.0,
+              left: _isExpanded ? null : (_currentWidth - 40.0) / 2,
+              right: _isExpanded ? 8.0 : null,
+              child: Material(
+                color: Theme.of(context).colorScheme.secondary.withOpacity(0.8),
+                elevation: 2,
+                shape: const CircleBorder(),
+                clipBehavior: Clip.antiAlias,
+                child: SizedBox(
+                  width: 40.0,
+                  height: 40.0,
+                  child: IconButton(
+                    icon: Icon(
+                      _isExpanded ? Icons.chevron_left : Icons.chevron_right,
+                      size: 40.0 * 0.5,
+                    ),
+                    color: Theme.of(context).colorScheme.onSecondary,
+                    onPressed: _toggleExpand,
+                    splashRadius: 40.0 / 2,
+                    padding: EdgeInsets.zero,
+                    visualDensity: VisualDensity.compact,
+                    tooltip: _isExpanded ? "Collapse Panel" : "Expand Panel",
                   ),
-                  color: Theme.of(context).colorScheme.onSecondary,
-                  onPressed: _toggleExpand,
-                  splashRadius: _buttonSize / 2,
-                  padding: EdgeInsets.zero,
-                  visualDensity: VisualDensity.compact,
-                  tooltip: _isExpanded ? "Collapse Panel" : "Expand Panel",
                 ),
               ),
-            ),
-          )
+            )
         ],
       ),
     );

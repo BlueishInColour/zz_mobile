@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:provider/provider.dart';
+import 'package:yt/accounts/providers/accounting_provider.dart';
 import 'package:yt/firebase_options.dart';
 
 import 'package:google_fonts/google_fonts.dart';
@@ -27,8 +28,9 @@ void main()async {
         ChangeNotifierProvider(create: (_) => JotterProvider()),
         ChangeNotifierProvider(create: (_) => ChatProvider()..loadUserProfile()), // Initialize and load user
         ChangeNotifierProvider(create: (_) => StoryProvider()), // Initialize and load user
+  ChangeNotifierProvider(create: (context) => AccountingProvider()),
 
-        //  ENSURE THIS LINE IS PRESENT AND CORRECT  //
+  //  ENSURE THIS LINE IS PRESENT AND CORRECT  //
         ChangeNotifierProvider(create: (_) => ChatsTabContentStateProvider()),
         // Add any other global providers here
       ],
@@ -70,12 +72,13 @@ class MyApp extends StatelessWidget {
             ))
           )
         ),
-        textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme).copyWith(
-          bodyLarge: GoogleFonts.inter(textStyle: ThemeData.dark().textTheme.bodyLarge),
-          bodyMedium: GoogleFonts.inter(textStyle: ThemeData.dark().textTheme.bodyMedium),
-          displayLarge: GoogleFonts.inter(textStyle: ThemeData.dark().textTheme.displayLarge, fontWeight: FontWeight.bold),
-        ),
-      ),
+    fontFamily: 'HelveticaNeue', // Use the family name defined in pubspec.yaml
+
+    // You can also customize text themes further if needed
+    textTheme: const TextTheme(
+    displayLarge: TextStyle(fontFamily: 'HelveticaNeue', /* other properties */),
+    ),
+    ),
       home: const AuthGate(),
     );
   }
